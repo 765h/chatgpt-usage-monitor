@@ -99,6 +99,7 @@ def _fmt_updated(fetched_at) -> str:
 
 
 _popup_ref = [None]
+_close_popup = [False]
 
 
 def _usage_bar(parent, ratio: float) -> None:
@@ -122,13 +123,10 @@ def _usage_bar(parent, ratio: float) -> None:
 
 
 def show_popup(stats: dict):
-    try:
-        if _popup_ref[0] and _popup_ref[0].winfo_exists():
-            _popup_ref[0].lift()
-            return
-    except Exception:
-        _popup_ref[0] = None
+    if _popup_ref[0] is not None:
+        return
 
+    _close_popup[0] = False
     win = tk.Tk()
     win.title("")
     win.configure(bg=BG)
@@ -172,9 +170,14 @@ def show_popup(stats: dict):
     w, h = win.winfo_reqwidth(), win.winfo_reqheight()
     win.geometry(f"{w}x{h}+{sw - w - 16}+{sh - h - 56}")
 
-    win.bind("<Escape>", lambda e: win.destroy())
-    win.bind("<FocusOut>", lambda e: win.after(100, lambda: win.destroy() if not win.focus_get() else None))
+    def _check_close():
+        if _close_popup[0]:
+            win.destroy()
+            return
+        win.after(100, _check_close)
 
+    win.bind("<Escape>", lambda e: win.destroy())
+    win.after(100, _check_close)
     _popup_ref[0] = win
     win.mainloop()
     _popup_ref[0] = None
@@ -210,12 +213,9 @@ def run_tray(on_quit=None):
         tray_icon.title = tooltip
 
     def on_click(icon, button):
-        try:
-            if _popup_ref[0] and _popup_ref[0].winfo_exists():
-                _popup_ref[0].destroy()
-                return
-        except Exception:
-            _popup_ref[0] = None
+        if _popup_ref[0] is not None:
+            _close_popup[0] = True
+            return
         with lock:
             s = dict(stats)
         threading.Thread(target=show_popup, args=(s,), daemon=True).start()
