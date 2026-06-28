@@ -3,7 +3,6 @@ import ctypes
 import hashlib
 import os
 import shutil
-import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -13,7 +12,7 @@ import winreg
 BUNDLE      = Path(getattr(sys, '_MEIPASS', Path(__file__).parent))
 INSTALL_DIR = Path(os.environ['APPDATA']) / 'ClaudeMonitor'
 MARKER      = INSTALL_DIR / '.installed'
-LOCK_PORT   = 19876
+_MUTEX_NAME = "Global\\ClaudeUsageMonitorMutex"
 _REG_KEY    = r'SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist'
 
 
@@ -82,10 +81,9 @@ if __name__ == '__main__':
             )
             sys.exit(0)
 
-    _lock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        _lock.bind(('127.0.0.1', LOCK_PORT))
-    except OSError:
+    # OS が保持するミューテックスで重複起動を防ぐ（ソケットと異なりGCの影響を受けない）
+    _mutex = ctypes.windll.kernel32.CreateMutexW(None, False, _MUTEX_NAME)
+    if ctypes.windll.kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
         sys.exit(0)
 
     import server
