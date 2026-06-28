@@ -1,0 +1,16 @@
+# 秘密鍵・生成ファイル
+extension.pem
+chrome_extension.crx
+
+# ビルド成果物
+dist/
+build/
+*.spec
+
+# Python
+__pycache__/
+*.py[cod]
+
+# 廃止済みアプローチ
+claude_api.py
+usage_parser.py
