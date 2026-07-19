@@ -14,3 +14,6 @@ __pycache__/
 # 廃止済みアプローチ
 claude_api.py
 usage_parser.py
+
+# Claude Code 個人設定（公開しない）
+.claude/
