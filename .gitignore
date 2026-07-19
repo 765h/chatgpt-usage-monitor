@@ -17,3 +17,4 @@ usage_parser.py
 
 # Claude Code 個人設定（公開しない）
 .claude/
+CLAUDE.md
