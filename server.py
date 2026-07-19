@@ -47,6 +47,23 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.end_headers()
 
+    def do_GET(self):
+        # Claude Codeのフック（usage-guard.js）が使用率を照会するためのエンドポイント
+        if self.path != "/usage":
+            self.send_response(404)
+            self.end_headers()
+            return
+        data = get_last_data()
+        body = json.dumps(
+            data,
+            default=lambda o: o.isoformat() if isinstance(o, datetime) else str(o),
+        ).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def log_message(self, *args):
         pass
 
