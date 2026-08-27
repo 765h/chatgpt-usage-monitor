@@ -1,86 +1,41 @@
-# Claude Usage Monitor
+# ChatGPT Usage Monitor
 
-Claude Pro プランの使用率（5時間ウィンドウ・週間）を Windows システムトレイにリアルタイム表示する常駐アプリ。
+ChatGPT Plus / Pro のCodex使用率（5時間・週間）をWindowsのシステムトレイに表示します。
 
-![screenshot](https://github.com/user-attachments/assets/placeholder)
+Codexが `~/.codex/sessions/**/*.jsonl` に記録する最新の `rate_limits` を読み取ります。さらに、Codex app-serverの `account/rateLimits/read` から `gpt-reserve`（Luna reserve）を取得します。APIキー、Chrome拡張、ブラウザCookieは読み取りません。会話本文も読み取りません。
 
-## 動作イメージ
-
-- トレイアイコンに使用率（%）を数値で表示
-- 50% 未満: 緑、80% 未満: 黄、80% 以上: 赤、100%: ×
-- クリックでポップアップ表示（セッション・週間の詳細）
-
-## アーキテクチャ
-
-```
-claude.ai (Chrome)
-    └─ Chrome 拡張 (MV3 Service Worker)
-           │  30秒ごとに /api/organizations/{id}/usage を取得
-           ▼
-   localhost:9876/usage  ← HTTP POST (JSON)
-           │
-    Python トレイアプリ
-           └─ システムトレイアイコンを更新
-```
-
-Chrome 拡張がブリッジとして動作するため、Cookie 直接読み取りや外部 API キーは不要。
+Luna reserveの取得に失敗した場合は、その行を表示せず、Session・Weeklyだけを表示します。
+標準枠が上限に達してLuna reserveへ切り替わった場合は、トレイ数字に紫色の「L」バッジを表示します。
 
 ## 必要環境
 
 - Windows 10/11
-- Google Chrome
-- Python 3.9+（開発・ビルド時のみ）
+- CodexデスクトップアプリまたはCodex CLI
+- Python 3.10+（開発・ビルド時のみ）
 
-## インストール（exe を使う場合）
+## インストール
 
-1. [Releases](../../releases) から `ClaudeMonitor.exe` をダウンロード
-2. 実行する（UAC ダイアログが出るので「はい」）
-3. Chrome を完全に再起動する
-4. `claude.ai` にログインする
+1. [Releases](../../releases) から `ChatGPTUsageMonitor.exe` をダウンロード
+2. `ChatGPTUsageMonitor.exe` を実行
 
-初回実行で以下が自動セットアップされます：
+初回実行時に `%APPDATA%\ChatGPTUsageMonitor\` へコピーし、Windowsログオン時の自動起動を登録します。
 
-- Chrome 拡張を `%APPDATA%\ClaudeMonitor\` にコピー・ポリシー登録
-- ログオン時自動起動タスクの登録
-- トレイアプリの起動
-
-## 開発セットアップ
+## 開発
 
 ```powershell
-# 依存ライブラリのインストールと Chrome 拡張のパック
 powershell -ExecutionPolicy Bypass -File setup.ps1
-
-# 直接起動（開発時）
 python main.py
+python -m unittest -v
 ```
 
-## ビルド（exe 生成）
+Codexが一度も使用量を記録していない場合、トレイは「データ待機中」と表示します。
+
+## ビルド
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File build.ps1
-# -> dist/ClaudeMonitor.exe が生成される
+# dist/ChatGPTUsageMonitor.exe
 ```
-
-`setup.ps1` で生成した `extension.pem` と `chrome_extension.crx` が必要です。
-
-## ファイル構成
-
-```
-├── main.py                  # エントリーポイント・インストーラー
-├── server.py                # localhost:9876 HTTP サーバー
-├── tray.py                  # システムトレイ・ポップアップ UI
-├── chrome_extension/
-│   ├── manifest.json        # Chrome 拡張マニフェスト (MV3)
-│   └── background.js        # Service Worker（使用量の取得・送信）
-├── requirements.txt
-├── setup.ps1                # 開発環境セットアップ
-└── build.ps1                # PyInstaller ビルド
-```
-
-## 注意事項
-
-- `claude.ai` の内部 API を使用しているため、Anthropic の仕様変更により動作しなくなる可能性があります
-- Chrome の拡張機能ポリシー (`HKLM\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist`) を変更するため、管理者権限が必要です
 
 ## ライセンス
 

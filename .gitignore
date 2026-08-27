@@ -6,6 +6,7 @@ chrome_extension.crx
 dist/
 build/
 *.spec
+tmp*/
 
 # Python
 __pycache__/
