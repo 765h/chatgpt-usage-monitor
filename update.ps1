@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 $Root      = Split-Path -Parent $MyInvocation.MyCommand.Path
 $NewExe    = "$Root\dist\ChatGPTUsageMonitor.exe"
 $InstallDir = "$env:APPDATA\ChatGPTUsageMonitor"
@@ -17,7 +17,15 @@ $procs = Get-Process ChatGPTUsageMonitor -ErrorAction SilentlyContinue
 if ($procs) {
     Write-Host "既存プロセスを停止中..." -ForegroundColor Yellow
     $procs | Stop-Process -Force
-    Start-Sleep -Milliseconds 800
+    $remaining = @(Get-Process ChatGPTUsageMonitor -ErrorAction SilentlyContinue)
+    for ($attempt = 0; $attempt -lt 50 -and $remaining.Count -gt 0; $attempt++) {
+        Start-Sleep -Milliseconds 100
+        $remaining = @(Get-Process ChatGPTUsageMonitor -ErrorAction SilentlyContinue)
+    }
+    if ($remaining.Count -gt 0) {
+        Write-Error "既存プロセスが5秒以内に終了しないため、差し替えを中止しました。"
+        exit 1
+    }
 }
 
 Write-Host "exe を差し替え中..."

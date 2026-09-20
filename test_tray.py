@@ -179,6 +179,32 @@ class RemainingRatioTest(unittest.TestCase):
         ]
         self.assertEqual(len(refresh_calls), 2)
 
+    def test_popup_refresh_clears_previous_stats_when_live_data_is_empty(self):
+        win = MagicMock()
+        win.winfo_screenwidth.return_value = 1920
+        win.winfo_screenheight.return_value = 1080
+        win.winfo_reqwidth.return_value = 200
+        win.winfo_reqheight.return_value = 300
+        with (
+            patch.object(tray.tk, "Tk", return_value=win),
+            patch.object(tray.tk, "Frame", return_value=MagicMock()),
+            patch.object(tray.tk, "Label", return_value=MagicMock()) as label,
+            patch.object(tray.tk, "Button", return_value=MagicMock()),
+            patch.object(tray, "_usage_bar"),
+            patch.object(tray.codex_usage, "get_last_data", return_value={}) as get_data,
+        ):
+            tray.show_popup({"utilization_5h": 0.2})
+            refresh = next(
+                item.args[1] for item in win.after.call_args_list
+                if item.args[0] == tray.POLL_INTERVAL * 1000
+            )
+            refresh()
+
+        get_data.assert_called_once_with()
+        texts = [item.kwargs.get("text") for item in label.call_args_list]
+        self.assertIn("80%", texts)
+        self.assertIn("—", texts)
+
     def test_popup_refresh_keeps_resized_window_inside_screen(self):
         win = MagicMock()
         win.winfo_screenwidth.return_value = 1366
@@ -272,6 +298,28 @@ class RemainingRatioTest(unittest.TestCase):
         self.assertEqual(get_data.call_count, 3)
         log.assert_called_once_with("Tray usage update failed")
         self.assertEqual(make_icon.call_args_list[-1].args, (0.8, False, None))
+
+    def test_tray_poll_clears_previous_stats_when_live_data_is_empty(self):
+        icon = MagicMock()
+        initial = {"utilization_5h": 0.2, "utilization_weekly": 0.3}
+        with (
+            patch.object(tray.pystray, "Icon", return_value=icon),
+            patch.object(
+                tray.codex_usage,
+                "get_last_data",
+                side_effect=[initial, {}],
+            ) as get_data,
+            patch.object(tray.threading, "Thread") as thread,
+            patch.object(tray, "make_icon", return_value=MagicMock()) as make_icon,
+            patch.object(tray.time, "sleep", side_effect=[None, KeyboardInterrupt]),
+        ):
+            tray.run_tray()
+            poll_loop = thread.call_args.kwargs["target"]
+            with self.assertRaises(KeyboardInterrupt):
+                poll_loop()
+
+        self.assertEqual(get_data.call_count, 2)
+        self.assertEqual(make_icon.call_args_list[-1].args, (None, False, None))
 
     def test_popup_missing_usage_has_no_bars(self):
         win = MagicMock()

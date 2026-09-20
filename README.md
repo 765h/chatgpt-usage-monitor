@@ -2,9 +2,9 @@
 
 ChatGPT Plus / Pro のCodex使用率（5時間・週間）をWindowsのシステムトレイに表示します。
 
-Codexが `~/.codex/sessions/**/*.jsonl` に記録する最新の `rate_limits` を読み取ります。さらに、Codex app-serverの `account/rateLimits/read` から `gpt-reserve`（Luna reserve）を取得します。APIキー、Chrome拡張、ブラウザCookieは読み取りません。会話本文も読み取りません。
+起動後はCodex app-serverの `account/rateLimits/read` を定期的に読み取り、応答の `rateLimits.primary` / `secondary` をSession / Weekly、`gpt-reserve` をLuna reserveとして表示します。APIキー、Chrome拡張、ブラウザCookieは読み取りません。会話本文も読み取りません。
 
-Luna reserveの取得に失敗した場合は、その行を表示せず、Session・Weeklyだけを表示します。
+ライブ取得に失敗した場合は古いJSONLへ戻さず、取得できた項目だけを表示します。
 標準枠が上限に達してLuna reserveへ切り替わった場合は、トレイ数字に紫色の「L」バッジを表示します。
 
 ## 必要環境

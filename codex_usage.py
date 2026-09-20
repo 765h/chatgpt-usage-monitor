@@ -1,4 +1,5 @@
 import json
+import logging
 import math
 import queue
 import shutil
@@ -15,6 +16,7 @@ APP_SERVER_TIMEOUT = 8
 _luna_lock = threading.Lock()
 _luna_data: dict = {}
 _started = False
+LOGGER = logging.getLogger(__name__)
 
 
 def _parse_rate_limits(obj: dict) -> dict | None:
@@ -55,6 +57,48 @@ def _parse_rate_limits(obj: dict) -> dict | None:
         "utilization_weekly": secondary[0],
         "resets_at_weekly": secondary[1],
         "fetched_at": fetched_at,
+    }
+
+
+def _parse_app_server_rate_limits(result: dict | None) -> dict | None:
+    if not isinstance(result, dict):
+        return None
+    limits = result.get("rateLimits")
+    if not isinstance(limits, dict):
+        return None
+
+    def window(name: str) -> tuple[float, datetime | None]:
+        value = limits.get(name)
+        if not isinstance(value, dict):
+            raise ValueError
+        raw_used_percent = value.get("usedPercent")
+        if raw_used_percent is None or isinstance(raw_used_percent, bool):
+            raise ValueError
+        used_percent = float(raw_used_percent)
+        if not math.isfinite(used_percent) or not 0 <= used_percent <= 100:
+            raise ValueError
+
+        reset_at = None
+        raw_reset_at = value.get("resetsAt")
+        if raw_reset_at is not None:
+            if isinstance(raw_reset_at, bool):
+                raise ValueError
+            reset_seconds = float(raw_reset_at)
+            if not math.isfinite(reset_seconds):
+                raise ValueError
+            reset_at = datetime.fromtimestamp(reset_seconds, timezone.utc)
+        return used_percent / 100, reset_at
+
+    try:
+        primary = window("primary")
+        secondary = window("secondary")
+    except (KeyError, TypeError, ValueError, OverflowError, OSError):
+        return None
+    return {
+        "utilization_5h": primary[0],
+        "resets_at_5h": primary[1],
+        "utilization_weekly": secondary[0],
+        "resets_at_weekly": secondary[1],
     }
 
 
@@ -217,27 +261,33 @@ def _parse_luna_reserve(result: dict | None) -> dict | None:
 
 
 def _update_luna_reserve() -> None:
-    parsed = _parse_luna_reserve(_read_app_server_rate_limits())
+    result = _read_app_server_rate_limits()
+    parsed_standard = _parse_app_server_rate_limits(result)
+    parsed_luna = _parse_luna_reserve(result)
     with _luna_lock:
-        was_active = _luna_data.get("luna_reserve_active") is True
         _luna_data.clear()
-        if parsed:
-            _luna_data.update(parsed)
-        elif was_active:
-            _luna_data.update({
-                "utilization_luna_reserve": None,
-                "resets_at_luna_reserve": None,
-                "luna_reserve_active": True,
-            })
+        if parsed_standard:
+            _luna_data.update(parsed_standard)
+        if parsed_luna:
+            _luna_data.update(parsed_luna)
+        if parsed_standard or parsed_luna:
+            _luna_data["fetched_at"] = datetime.now(timezone.utc)
 
 
 def _luna_poll_loop() -> None:
     while True:
-        _update_luna_reserve()
+        try:
+            _update_luna_reserve()
+        except Exception:
+            LOGGER.exception("App-server usage update failed")
         time.sleep(APP_SERVER_POLL_INTERVAL)
 
 
 def get_last_data() -> dict:
+    with _luna_lock:
+        if _started:
+            return dict(_luna_data)
+
     result = {}
     try:
         files = sorted(CODEX_SESSIONS.rglob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
@@ -250,11 +300,7 @@ def get_last_data() -> dict:
             break
     with _luna_lock:
         if _started:
-            result.update({
-                "utilization_luna_reserve": _luna_data.get("utilization_luna_reserve"),
-                "resets_at_luna_reserve": _luna_data.get("resets_at_luna_reserve"),
-                "luna_reserve_active": _luna_data.get("luna_reserve_active"),
-            })
+            return dict(_luna_data)
         else:
             result.update(_luna_data)
     return result

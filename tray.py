@@ -252,13 +252,12 @@ def show_popup(stats: dict):
             return
         try:
             latest = codex_usage.get_last_data()
-            if latest:
-                _render(latest)
-                sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
-                w, h = win.winfo_reqwidth(), win.winfo_reqheight()
-                x = max(0, sw - w - 16)
-                y = max(0, sh - h - 56)
-                win.geometry(f"{w}x{h}+{x}+{y}")
+            _render(latest)
+            sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
+            w, h = win.winfo_reqwidth(), win.winfo_reqheight()
+            x = max(0, sw - w - 16)
+            y = max(0, sh - h - 56)
+            win.geometry(f"{w}x{h}+{x}+{y}")
         except Exception:
             LOGGER.exception("Popup refresh failed")
         if not _close_popup[0]:
@@ -292,9 +291,9 @@ def run_tray(on_quit=None):
 
     def _poll_once():
         new_stats = codex_usage.get_last_data()
-        if new_stats:
-            with lock:
-                stats.update(new_stats)
+        with lock:
+            stats.clear()
+            stats.update(new_stats)
         _refresh_icon()
 
     def poll_loop():
